@@ -89,6 +89,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
   }
 
   const existingUser = await User.findOne({ phone, otp });
+  console.log(existingUser)
   if (!existingUser) {
     return res.respond(404, "Invalid OTP or Phone Number!");
   }
@@ -144,10 +145,16 @@ const RefreshAccessToken = asyncHandler(async (req, res) => {
   });
 });
 
+const getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find().select("-password -refreshToken -otp -otpExpiration"); 
+  res.respond(200, "Users fetched successfully", users);
+});
+
 module.exports = {
   registerUser,
   loginUser,
   verifyOtp,
   logoutUser,
   RefreshAccessToken,
+  getAllUsers
 };

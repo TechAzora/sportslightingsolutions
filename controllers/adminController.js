@@ -7,7 +7,7 @@ const generateAccessAndRefereshTokens = asyncHandler(async (userId) => {
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
 
-  await User.findByIdAndUpdate(
+  await Admin.findByIdAndUpdate(
     userId,
     { refreshToken },
     { validateBeforeSave: false }
