@@ -5,7 +5,8 @@ const validateOTP = require("../helper/validateOTP");
 const sendOTP = require("../helper/sendOtp");
 const generateOTP = require("../helper/generateOTP");
 
-const generateAccessAndRefereshTokens = asyncHandler(async (userId) => {
+// ###############---------------Generate Access And Refresh Token---------------###############
+const generateAccessAndRefreshTokens = asyncHandler(async (userId) => {
   const user = await User.findById(userId);
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
@@ -19,6 +20,8 @@ const generateAccessAndRefereshTokens = asyncHandler(async (userId) => {
   return { accessToken, refreshToken };
 });
 
+// ####################--------------------AUTH--------------------####################
+// ##########----------User Registration----------##########
 const registerUser = asyncHandler(async (req, res) => {
   const { username, email, phone, designation, state } = req.body;
 
@@ -37,7 +40,12 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const otp = await generateOTP();
-  await sendOTP(phone, otp);
+
+  try {
+    await sendOTP(phone, otp);
+  } catch (error) {
+    return res.respond(500, "Failed to send OTP. Please try again later.");
+  }
 
   const user = await User.create({
     username,
@@ -49,9 +57,13 @@ const registerUser = asyncHandler(async (req, res) => {
     otpExpiration: new Date(),
   });
 
-  res.respond(200, "User registered successfully!", user);
+  delete user._doc.otp;
+  delete user._doc.otpExpiration;
+
+  res.respond(201, "User registered successfully!", user);
 });
 
+// ##########----------User Login----------##########
 const loginUser = asyncHandler(async (req, res) => {
   const { phone } = req.body;
 
@@ -67,16 +79,31 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!existingUser) {
     return res.respond(404, "User not found with this phone number!");
   }
+  if (existingUser.status !== "approved") {
+    return res.respond(
+      403,
+      "Your account has not been approved yet. Please try again later."
+    );
+  }
 
   const otp = await generateOTP();
-  await sendOTP(phone, otp);
+
+  try {
+    await sendOTP(phone, otp);
+  } catch (error) {
+    return res.respond(500, "Failed to send OTP. Please try again later.");
+  }
+
+  existingUser.otp = otp;
+  existingUser.otpExpiration = new Date();
+  await existingUser.save();
 
   res.respond(200, "User Sent Successfully!", {
     phone,
-    otp,
   });
 });
 
+// ##########----------User OTP Verification----------##########
 const verifyOtp = asyncHandler(async (req, res) => {
   const { phone, otp } = req.body;
 
@@ -89,7 +116,6 @@ const verifyOtp = asyncHandler(async (req, res) => {
   }
 
   const existingUser = await User.findOne({ phone, otp });
-  console.log(existingUser)
   if (!existingUser) {
     return res.respond(404, "Invalid OTP or Phone Number!");
   }
@@ -99,7 +125,14 @@ const verifyOtp = asyncHandler(async (req, res) => {
     return res.respond(404, "OTP has Expired!");
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+  if (existingUser.status !== "approved") {
+    return res.respond(
+      403,
+      "Your account has not been approved yet. Please try again later."
+    );
+  }
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
     existingUser._id
   );
 
@@ -112,11 +145,13 @@ const verifyOtp = asyncHandler(async (req, res) => {
   });
 });
 
+// ##########----------User Logout----------##########
 const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(req.user, { refreshToken: null });
   res.respond(200, "User logged Out Successfully!");
 });
 
+// ##########----------Refresh User's Access Token----------##########
 const RefreshAccessToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
@@ -136,18 +171,80 @@ const RefreshAccessToken = asyncHandler(async (req, res) => {
     return res.respond(401, "Refresh token expired or invalid!");
   }
 
-  const { accessToken, newRefreshToken } =
-    await generateAccessAndRefereshTokens(user._id);
+  const { accessToken, newRefreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
 
   res.respond(200, "Access token refreshed", {
     accessToken,
     refreshToken: newRefreshToken,
   });
 });
+// ####################--------------------AUTH End's Here--------------------####################
 
+// ##########----------Update User's Profile----------##########
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const { username, email, designation, state } = req.body;
+
+  const existingUser = await User.findById(userId);
+  if (!existingUser) {
+    return res.respond(404, "User not found with this ID!");
+  }
+
+  existingUser.username = username;
+  existingUser.email = email;
+  existingUser.designation = designation;
+  existingUser.state = state;
+  await existingUser.save();
+
+  res.respond(200, "User's Profile updated successfully!", existingUser);
+});
+
+// ##########----------Change User's status----------##########
+const updateUserStatus = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.respond(400, "Status is required!");
+  }
+
+  const existingUser = await User.findById(userId);
+  if (!existingUser) {
+    return res.respond(404, "User not found with this ID!");
+  }
+
+  existingUser.status = status;
+  await existingUser.save();
+
+  res.respond(200, "User's status successfully updated!", existingUser);
+});
+
+// ##########----------Retrieve All Users----------##########
 const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await User.find().select("-password -refreshToken -otp -otpExpiration"); 
+  const users = await User.find().select("-otp -otpExpiration");
   res.respond(200, "Users fetched successfully", users);
+});
+
+// ##########----------Get User's Profile----------##########
+const getUserProfile = asyncHandler(async (req, res) => {
+  const userId = req.user;
+  const userProfile = await User.findById(userId).select("-otp -otpExpiration");
+  if (!userProfile) {
+    return res.respond(404, "User not found!");
+  }
+
+  res.respond(200, "User's Profile fetched successfully", userProfile);
+});
+
+// ##########----------Delete User's Profile----------##########
+const deleteUserProfile = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+
+  await User.findByIdAndDelete(userId);
+
+  res.respond(200, "User's Profile deleted successfully!");
 });
 
 module.exports = {
@@ -156,5 +253,9 @@ module.exports = {
   verifyOtp,
   logoutUser,
   RefreshAccessToken,
-  getAllUsers
+  updateUserProfile,
+  updateUserStatus,
+  getAllUsers,
+  getUserProfile,
+  deleteUserProfile,
 };

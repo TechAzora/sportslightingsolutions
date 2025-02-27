@@ -1,8 +1,10 @@
 const { asyncHandler } = require("../utils/asyncHandler");
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/adminModel");
+const User = require("../models/userModel");
 
-const generateAccessAndRefereshTokens = asyncHandler(async (userId) => {
+// ###############---------------Generate Access And Refresh Token---------------###############
+const generateAccessAndRefreshTokens = asyncHandler(async (userId) => {
   const user = await Admin.findById(userId);
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
@@ -16,6 +18,8 @@ const generateAccessAndRefereshTokens = asyncHandler(async (userId) => {
   return { accessToken, refreshToken };
 });
 
+// ####################--------------------AUTH--------------------####################
+// ##########----------Admin Registration----------##########
 const registerAdmin = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -40,9 +44,10 @@ const registerAdmin = asyncHandler(async (req, res) => {
     password,
   });
 
-  res.respond(200, "Admin registered successfully!", admin);
+  res.respond(201, "Admin registered successfully!", admin);
 });
 
+// ##########----------Admin Login----------##########
 const loginAdmin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -62,7 +67,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
     return res.respond(401, "Invalid user credentials");
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
     user._id
   );
 
@@ -75,12 +80,14 @@ const loginAdmin = asyncHandler(async (req, res) => {
   });
 });
 
+// ##########----------Admin Logout----------##########
 const logoutAdmin = asyncHandler(async (req, res) => {
   await Admin.findByIdAndUpdate(req.user, { refreshToken: null });
 
   res.respond(200, "User logged Out successfully!");
 });
 
+// ##########----------Refresh Admin's Access Token----------##########
 const RefreshAccessToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
@@ -98,53 +105,30 @@ const RefreshAccessToken = asyncHandler(async (req, res) => {
     return res.respond(401, "Refresh token expired or invalid!");
   }
 
-  const { accessToken, newRefreshToken } =
-    await generateAccessAndRefereshTokens(user._id);
+  const { accessToken, newRefreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
 
   res.respond(200, "Access token refreshed", {
     accessToken,
     refreshToken: newRefreshToken,
   });
 });
+// ####################--------------------AUTH End's Here--------------------####################
 
-// const totalCounts = asyncHandler(async (req, res) => {
-//   const totalClient = await Client.countDocuments();
-//   const totalCase = await Case.countDocuments();
-//   const totalWorkInProgress = await Case.countDocuments({ status: "pending" });
-//   const totalInsufficient = await Case.countDocuments({ status: "failed" });
-//   const totalFinal = await Case.countDocuments({ status: "complete" });
+// ##########----------Total Counts----------##########
+const totalCounts = asyncHandler(async (req, res) => {
+  const totalUsers = await User.countDocuments();
 
-//   // Calculate Pending Revenue
-//   const pendingCases = await Case.find({ status: "pending" }).populate(
-//     "cheque"
-//   );
-//   const pendingRevenue = pendingCases.reduce((sum, caseItem) => {
-//     return sum + (caseItem.cheque?.price || 0);
-//   }, 0);
-
-//   // Calculate Total Revenue
-//   const completedCases = await Case.find({ status: "complete" }).populate(
-//     "cheque"
-//   );
-//   const totalRevenue = completedCases.reduce((sum, caseItem) => {
-//     return sum + (caseItem.cheque?.price || 0);
-//   }, 0);
-
-//   res.respond(200, "Total Counts Fetched!", {
-//     totalClient,
-//     totalCase,
-//     totalWorkInProgress,
-//     totalInsufficient,
-//     totalFinal,
-//     pendingRevenue,
-//     totalRevenue,
-//   });
-// });
+  res.respond(200, "Total Counts Fetched Successfully!", {
+    totalUsers,
+  });
+});
 
 module.exports = {
   registerAdmin,
   loginAdmin,
   logoutAdmin,
   RefreshAccessToken,
-  // totalCounts,
+  totalCounts,
 };
