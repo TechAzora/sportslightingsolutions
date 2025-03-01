@@ -4,19 +4,23 @@ const Admin = require("../models/adminModel");
 const User = require("../models/userModel");
 
 // ###############---------------Generate Access And Refresh Token---------------###############
-const generateAccessAndRefreshTokens = asyncHandler(async (userId) => {
-  const user = await Admin.findById(userId);
-  const accessToken = user.generateAccessToken();
-  const refreshToken = user.generateRefreshToken();
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await Admin.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
-  await Admin.findByIdAndUpdate(
-    userId,
-    { refreshToken },
-    { validateBeforeSave: false }
-  );
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
 
-  return { accessToken, refreshToken };
-});
+    return { accessToken, refreshToken };
+  } catch (error) {
+    res.respond(
+      500,
+      "Something went wrong while generating referesh and access token!"
+    );
+  }
+};
 
 // ####################--------------------AUTH--------------------####################
 // ##########----------Admin Registration----------##########
