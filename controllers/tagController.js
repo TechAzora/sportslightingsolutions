@@ -62,7 +62,7 @@ const getAllTag = asyncHandler(async (req, res) => {
     totalCount,
     currentPageCount: tags.length,
     currentPage: page,
-    totalPages: Math.ceil(totalTags / limit),
+    totalPages: Math.ceil(totalCount / limit),
     data: tags,
   });
 });
