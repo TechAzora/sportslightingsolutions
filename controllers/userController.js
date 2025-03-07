@@ -227,8 +227,33 @@ const updateUserStatus = asyncHandler(async (req, res) => {
 
 // ##########----------Retrieve All Users----------##########
 const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await User.find().select("-otp -otpExpiration");
-  res.respond(200, "Users fetched successfully", users);
+  let { page = 1, limit = 10, search = "" } = req.query;
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  const filter = {
+    $or: [
+      { username: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+      { phone: { $regex: search, $options: "i" } },
+    ],
+  };
+
+  const totalUsers = await User.countDocuments();
+
+  const users = await User.find(filter)
+    .select("-otp -otpExpiration")
+    .skip((page - 1) * limit)
+    .limit(limit);
+
+  res.respond(200, "Users fetched successfully", {
+    totalCount: totalUsers,
+    currentPageCount: users.length,
+    currentPage: page,
+    totalPages: Math.ceil(totalUsers / limit),
+    data: users,
+  });
 });
 
 // ##########----------Get User's Profile----------##########

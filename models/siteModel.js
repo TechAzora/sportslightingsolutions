@@ -25,12 +25,21 @@ const siteSchema = mongoose.Schema(
     noOfPoles: {
       type: Number,
     },
-    siteDocument: {
+    perLightConsumptionRate: {
       type: String,
     },
     stadiumType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tag",
+    },
+    siteDocument: {
       type: String,
-      enum: ["cricket", "football"],
+    },
+    noOfControllers: {
+      type: Number,
+    },
+    simCardNumber: {
+      type: String,
     },
   },
   {

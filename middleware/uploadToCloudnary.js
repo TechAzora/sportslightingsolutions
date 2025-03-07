@@ -12,15 +12,14 @@ const uploadToCloudinary = (folderName, fieldNames, maxCounts) => {
   const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
-      console.log("Uploading File:", file.originalname, "Type:", file.mimetype); // Debugging
+      console.log("Uploading File:", file.originalname, "Type:", file.mimetype);
 
-      // Determine resource type dynamically
-      let resourceType = "auto"; // Default
+      let resourceType = "auto";
       let format = undefined;
 
       const excelMimeTypes = [
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-        "application/vnd.ms-excel", // .xls
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
       ];
 
       if (file.mimetype.startsWith("image/")) {
@@ -29,9 +28,11 @@ const uploadToCloudinary = (folderName, fieldNames, maxCounts) => {
         resourceType = "raw";
       } else if (excelMimeTypes.includes(file.mimetype)) {
         resourceType = "raw";
-        format = file.mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          ? "xlsx"
-          : "xls"; // Only define format if it's an Excel file
+        format =
+          file.mimetype ===
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ? "xlsx"
+            : "xls";
       }
 
       return {
@@ -44,7 +45,6 @@ const uploadToCloudinary = (folderName, fieldNames, maxCounts) => {
 
   const upload = multer({ storage });
 
-  // Prepare fields
   const fields = fieldNames.map((name, index) => ({
     name: name,
     maxCount: maxCounts[index] || 1,
