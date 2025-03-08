@@ -1,7 +1,8 @@
 const { asyncHandler } = require("../utils/asyncHandler");
-const Site = require("../models/siteModel");
+const { Site, Pole } = require("../models/siteModel");
 const Tag = require("../models/tagModel");
 
+// ###############---------------Site Code Starts Here ---------------###############
 // ##########----------Create Site----------##########
 const createSite = asyncHandler(async (req, res) => {
   const {
@@ -166,6 +167,77 @@ const deleteSite = asyncHandler(async (req, res) => {
 
   res.respond(200, "Site deleted successfully!", deletedSite);
 });
+// ###############---------------Site Code Ends Here ---------------###############
+
+// ###############---------------Pole Code Starts Here ---------------###############
+// ##########----------Create Poles----------##########
+const createPoles = asyncHandler(async (req, res) => {
+  const { siteId } = req.params;
+  const { poles } = req.body;
+
+  if (!siteId || !poles || !poles.length) {
+    return res.respond(400, "Invalid Data!");
+  }
+
+  for (const pole of poles) {
+    if (!pole.poleName || !pole.devices || !Array.isArray(pole.devices)) {
+      return res.respond(
+        400,
+        "Each pole must have a poleName and an array of devices."
+      );
+    }
+  }
+
+  const createdPoles = await Pole.insertMany(
+    poles.map((pole) => ({ siteId, ...pole }))
+  );
+
+  await Site.findByIdAndUpdate(siteId, {
+    $push: { poles: { $each: createdPoles.map((p) => p._id) } },
+  });
+
+  res.respond(201, "Poles created successfully!", createdPoles);
+});
+
+// ##########----------Update Pole----------##########
+const updatePole = asyncHandler(async (req, res) => {
+  const { poleId } = req.params;
+  let { devices, ...updates } = req.body;
+
+  const updatedPole = await Pole.findByIdAndUpdate(poleId,
+    { ...updates, devices },
+    { new: true, runValidators: true }
+);
+
+  if (!updatedPole) return res.respond(404, "Pole not found!");
+
+  res.respond(200, "Pole updated successfully!", updatedPole);
+});
+
+// ##########----------Get Poles By Site----------##########
+const getPolesBySite = asyncHandler(async (req, res) => {
+  const { siteId } = req.params;
+  if (!siteId) return res.respond(400, "siteId is required!");
+
+  const poles = await Pole.find({ siteId });
+
+  res.respond(200, "Poles fetched successfully!", poles);
+});
+
+// ##########----------Delete Pole----------##########
+const deletePole = asyncHandler(async (req, res) => {
+  const { poleId } = req.params;
+
+  const deletedPole = await Pole.findByIdAndDelete(poleId);
+  if (!deletedPole) return res.respond(404, "Pole not found!");
+
+  await Site.findByIdAndUpdate(deletedPole.siteId, {
+    $pull: { poles: poleId },
+  });
+
+  res.respond(200, "Pole deleted successfully!", deletedPole);
+});
+// ###############---------------Pole Code Ends Here ---------------###############
 
 module.exports = {
   createSite,
@@ -173,4 +245,8 @@ module.exports = {
   getAllSites,
   getSiteById,
   deleteSite,
+  createPoles,
+  updatePole,
+  getPolesBySite,
+  deletePole,
 };

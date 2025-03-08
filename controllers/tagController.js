@@ -1,6 +1,6 @@
 const { asyncHandler } = require("../utils/asyncHandler");
 const Tag = require("../models/tagModel");
-const Site = require("../models/siteModel");
+const { Site } = require("../models/siteModel");
 
 // ##########----------Create Tag and Sub-Tag----------##########
 const createTag = asyncHandler(async (req, res) => {

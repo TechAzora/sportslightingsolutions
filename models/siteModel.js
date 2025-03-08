@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 
+// ##########----------Site Schema Starts Here----------##########
 const siteSchema = mongoose.Schema(
   {
     siteName: {
@@ -41,10 +42,52 @@ const siteSchema = mongoose.Schema(
     simCardNumber: {
       type: String,
     },
+    poles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Pole",
+      },
+    ],
   },
   {
     timestamps: true,
   }
 );
 
-module.exports = mongoose.model("Site", siteSchema);
+const Site = mongoose.model("Site", siteSchema);
+// ##########----------Site Schema Ends Here----------##########
+
+// ##########----------Pole Schema Starts Here----------##########
+const poleSchema = mongoose.Schema(
+  {
+    siteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Site",
+    },
+    poleName: {
+      type: String,
+      trim: true,
+    },
+    devices: [
+      {
+        serialNumber: {
+          type: String,
+        },
+        deviceType: {
+          type: String,
+        },
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Pole = mongoose.model("Pole", poleSchema);
+// ##########----------Pole Schema Ends Here----------##########
+
+module.exports = {
+  Site,
+  Pole,
+};
