@@ -29,10 +29,6 @@ const siteSchema = mongoose.Schema(
     perLightConsumptionRate: {
       type: String,
     },
-    stadiumType: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Tag",
-    },
     siteDocument: {
       type: String,
     },
@@ -48,6 +44,10 @@ const siteSchema = mongoose.Schema(
         ref: "Pole",
       },
     ],
+    game: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Game",
+    },
   },
   {
     timestamps: true,

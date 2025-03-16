@@ -1,6 +1,6 @@
 const { asyncHandler } = require("../utils/asyncHandler");
 const { Site, Pole } = require("../models/siteModel");
-const Tag = require("../models/tagModel");
+const Game = require("../models/gameModel");
 
 // ###############---------------Site Code Starts Here ---------------###############
 // ##########----------Create Site----------##########
@@ -13,7 +13,7 @@ const createSite = asyncHandler(async (req, res) => {
     electricRates,
     noOfPoles,
     perLightConsumptionRate,
-    stadiumType,
+    game,
     noOfControllers,
     simCardNumber,
   } = req.body;
@@ -26,16 +26,16 @@ const createSite = asyncHandler(async (req, res) => {
     !electricRates ||
     !noOfPoles ||
     !perLightConsumptionRate ||
-    !stadiumType ||
+    !game ||
     !noOfControllers ||
     !simCardNumber
   ) {
     return res.respond(400, "All fields are required!");
   }
 
-  const existingTag = await Tag.findById(stadiumType);
-  if (!existingTag) {
-    return res.respond(400, "Invalid stadiumType ID!");
+  const existingGame = await Game.findById(game);
+  if (!existingGame) {
+    return res.respond(400, "Invalid Game ID!");
   }
 
   const siteImage = req.files["siteImage"]
@@ -62,7 +62,7 @@ const createSite = asyncHandler(async (req, res) => {
     electricRates,
     noOfPoles,
     perLightConsumptionRate,
-    stadiumType,
+    game,
     noOfControllers,
     simCardNumber,
     siteImage,
@@ -70,8 +70,8 @@ const createSite = asyncHandler(async (req, res) => {
   });
 
   const populatedSite = await Site.findById(newSite._id).populate(
-    "stadiumType",
-    "stadiumType tags subTags"
+    "game",
+    "name"
   );
 
   res.respond(201, "Site created successfully!", populatedSite);
@@ -82,10 +82,10 @@ const updateSite = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
 
-  if (updateData.stadiumType) {
-    const existingTag = await Tag.findById(updateData.stadiumType);
-    if (!existingTag) {
-      return res.respond(400, "Invalid stadiumType ID!");
+  if (updateData.game) {
+    const existingGame = await Game.findById(updateData.game);
+    if (!existingGame) {
+      return res.respond(400, "Invalid Game ID!");
     }
   }
 
@@ -98,7 +98,7 @@ const updateSite = asyncHandler(async (req, res) => {
 
   const updatedSite = await Site.findByIdAndUpdate(id, updateData, {
     new: true,
-  }).populate("stadiumType", "stadiumType tags subTags");
+  }).populate("game", "name");
 
   if (!updatedSite) {
     return res.respond(404, "Site not found!");
@@ -125,7 +125,7 @@ const getAllSites = asyncHandler(async (req, res) => {
   const totalCount = await Site.countDocuments(filter);
 
   const sites = await Site.find(filter)
-    .populate("stadiumType", "stadiumType tags subTags")
+    .populate("game", "name")
     .skip((page - 1) * limit)
     .limit(limit)
     .sort({ createdAt: -1 });
@@ -143,10 +143,7 @@ const getAllSites = asyncHandler(async (req, res) => {
 const getSiteById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const site = await Site.findById(id).populate(
-    "stadiumType",
-    "stadiumType tags subTags"
-  );
+  const site = await Site.findById(id).populate("game", "name");
 
   if (!site) {
     return res.respond(404, "Site not found!");
@@ -204,10 +201,11 @@ const updatePole = asyncHandler(async (req, res) => {
   const { poleId } = req.params;
   let { devices, ...updates } = req.body;
 
-  const updatedPole = await Pole.findByIdAndUpdate(poleId,
+  const updatedPole = await Pole.findByIdAndUpdate(
+    poleId,
     { ...updates, devices },
     { new: true, runValidators: true }
-);
+  );
 
   if (!updatedPole) return res.respond(404, "Pole not found!");
 
