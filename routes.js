@@ -8,6 +8,7 @@ router.use("/site", require("./routes/siteRoute"));
 router.use("/pole", require("./routes/poleRoute"));
 router.use("/game", require("./routes/gameRoute"));
 router.use("/tag", require("./routes/tagRoute"));
+router.use("/device", require("./routes/deviceRoute"));
+router.use("/light", require("./routes/lightRoute"));
 
 module.exports = router;
-

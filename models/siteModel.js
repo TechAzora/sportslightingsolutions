@@ -70,12 +70,8 @@ const poleSchema = mongoose.Schema(
     },
     devices: [
       {
-        serialNumber: {
-          type: String,
-        },
-        deviceType: {
-          type: String,
-        },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Device",
       },
     ],
   },
@@ -87,7 +83,76 @@ const poleSchema = mongoose.Schema(
 const Pole = mongoose.model("Pole", poleSchema);
 // ##########----------Pole Schema Ends Here----------###########
 
+// ##########----------Device Schema(IoT Device) Starts Here----------##########
+const deviceSchema = mongoose.Schema(
+  {
+    poleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Pole",
+    },
+    serialNumber: {
+      type: String,
+      trim: true,
+    },
+    deviceType: {
+      type: String,
+      enum: ["Relay", "Dali", "DMX"],
+    },
+    status: {
+      type: String,
+      enum: ["ON", "OFF"],
+      default: "OFF",
+    },
+    lights: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Light",
+      },
+    ],
+  },
+  { timestamps: true }
+);
+const Device = mongoose.model("Device", deviceSchema);
+// ##########----------Device Schema(IoT Device) Ends Here----------##########
+
+// ##########----------Light Schema----------##########
+const lightSchema = mongoose.Schema(
+  {
+    deviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Device",
+      required: true,
+    },
+    serialNumber: {
+      type: String,
+      trim: true,
+    },
+    brightness: {
+      type: Number,
+      default: 100
+    },
+    tag: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tag",
+    },
+    subTag: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubTag",
+    },
+    status: {
+      type: String,
+      enum: ["ON", "OFF"],
+      default: "OFF",
+    },
+  },
+  { timestamps: true }
+);
+const Light = mongoose.model("Light", lightSchema);
+// ##########----------Light Schema Ends Here----------##########
+
 module.exports = {
   Site,
   Pole,
+  Device,
+  Light,
 };
