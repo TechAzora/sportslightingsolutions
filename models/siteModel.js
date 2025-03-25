@@ -129,7 +129,7 @@ const lightSchema = mongoose.Schema(
     },
     brightness: {
       type: Number,
-      default: 100
+      default: 100,
     },
     tag: {
       type: mongoose.Schema.Types.ObjectId,

@@ -7,12 +7,10 @@ const tagSchema = mongoose.Schema(
       type: String,
       trim: true,
     },
-    subTags: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "SubTag",
-      },
-    ],
+    site: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Site",
+    },
   },
   {
     timestamps: true,
@@ -28,6 +26,10 @@ const subTagSchema = mongoose.Schema(
     name: {
       type: String,
       trim: true,
+    },
+    tag: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tag",
     },
   },
   {
