@@ -5,40 +5,37 @@ const { Device, Light, Pole } = require("../models/siteModel");
 // ##########----------Create Devices----------##########
 const createDevices = asyncHandler(async (req, res) => {
   const { poleId } = req.params;
-  const { devices } = req.body;
+  const { serialNumber, deviceType } = req.body;
 
-  if (!poleId || !devices || !devices.length) {
+  if (!poleId || !serialNumber || !deviceType) {
     return res.respond(400, "Invalid Data!");
   }
 
-  for (const device of devices) {
-    if (!device.serialNumber || !device.deviceType) {
-      return res.respond(
-        400,
-        "Each device must have a serialNumber and deviceType."
-      );
-    }
-  }
-
-  const createdDevices = await Device.insertMany(
-    devices.map((device) => ({ poleId, ...device }))
-  );
-
-  await Pole.findByIdAndUpdate(poleId, {
-    $addToSet: { devices: { $each: createdDevices.map((d) => d._id) } },
+  const createdDevice = await Device.create({
+    serialNumber,
+    deviceType,
+    poleId,
   });
 
-  res.respond(201, "Devices created successfully!", createdDevices);
+  await Pole.findByIdAndUpdate(poleId, {
+    $addToSet: { devices: createdDevice._id },
+  });
+
+  res.respond(201, "Device created successfully!", createdDevice);
 });
 
 // ##########----------Update Device----------##########
 const updateDevice = asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
-  let updates = req.body;
+  const { serialNumber, deviceType } = req.body;
 
-  const updatedDevice = await Device.findByIdAndUpdate(deviceId, updates, {
-    new: true,
-  });
+  const updatedDevice = await Device.findByIdAndUpdate(
+    deviceId,
+    { serialNumber, deviceType },
+    {
+      new: true,
+    }
+  );
 
   if (!updatedDevice) return res.respond(404, "Device not found!");
 
@@ -74,27 +71,24 @@ const deleteDevice = asyncHandler(async (req, res) => {
 // ##########----------Create Lights----------##########
 const createLights = asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
-  const { lights } = req.body;
+  const { serialNumber, tag, subTag } = req.body;
 
-  if (!deviceId || !lights || !lights.length) {
+  if (!deviceId || !serialNumber || !tag || !subTag) {
     return res.respond(400, "Invalid Data!");
   }
 
-  for (const light of lights) {
-    if (!light.serialNumber) {
-      return res.respond(400, "Each light must have a serialNumber.");
-    }
-  }
-
-  const createdLights = await Light.insertMany(
-    lights.map((light) => ({ deviceId, ...light }))
-  );
-
-  await Device.findByIdAndUpdate(deviceId, {
-    $addToSet: { lights: { $each: createdLights.map((l) => l._id) } },
+  const createdLight = await Light.create({
+    serialNumber,
+    tag,
+    subTag,
+    deviceId,
   });
 
-  res.respond(201, "Lights created successfully!", createdLights);
+  await Device.findByIdAndUpdate(deviceId, {
+    $addToSet: { lights: createdLight._id },
+  });
+
+  res.respond(201, "Lights created successfully!", createdLight);
 });
 
 // ##########----------Update Light----------##########

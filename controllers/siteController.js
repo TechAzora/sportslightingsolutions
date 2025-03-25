@@ -170,41 +170,33 @@ const deleteSite = asyncHandler(async (req, res) => {
 // ##########----------Create Poles----------##########
 const createPoles = asyncHandler(async (req, res) => {
   const { siteId } = req.params;
-  const { poles } = req.body;
+  const { poleName } = req.body;
 
-  if (!siteId || !poles || !poles.length) {
-    return res.respond(400, "Invalid Data!");
+  if (!poleName) {
+    return res.respond(400, "Pole Name is required!");
   }
 
-  for (const pole of poles) {
-    if (!pole.poleName || !pole.devices || !Array.isArray(pole.devices)) {
-      return res.respond(
-        400,
-        "Each pole must have a poleName and an array of devices."
-      );
-    }
-  }
-
-  const createdPoles = await Pole.insertMany(
-    poles.map((pole) => ({ siteId, ...pole }))
-  );
-
-  await Site.findByIdAndUpdate(siteId, {
-    $push: { poles: { $each: createdPoles.map((p) => p._id) } },
+  const createdPole = await Pole.create({
+    poleName,
+    siteId,
   });
 
-  res.respond(201, "Poles created successfully!", createdPoles);
+  await Site.findByIdAndUpdate(siteId, {
+    $push: { poles: createdPole._id },
+  });
+
+  res.respond(201, "Poles created successfully!", createdPole);
 });
 
 // ##########----------Update Pole----------##########
 const updatePole = asyncHandler(async (req, res) => {
   const { poleId } = req.params;
-  let { devices, ...updates } = req.body;
+  let { poleName } = req.body;
 
   const updatedPole = await Pole.findByIdAndUpdate(
     poleId,
-    { ...updates, devices },
-    { new: true, runValidators: true }
+    { poleName },
+    { new: true }
   );
 
   if (!updatedPole) return res.respond(404, "Pole not found!");
