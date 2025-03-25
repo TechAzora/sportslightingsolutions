@@ -4,11 +4,11 @@ const { Site } = require("../models/siteModel");
 
 // ##########----------Create Game----------##########
 const createGame = asyncHandler(async (req, res) => {
-  const { name, tags } = req.body;
+  const { name } = req.body;
 
   if (!name) return res.respond(400, "Game name is required!");
 
-  const newGame = await Game.create({ name, tags });
+  const newGame = await Game.create({ name });
 
   res.respond(201, "Game created successfully!", newGame);
 });
@@ -16,11 +16,11 @@ const createGame = asyncHandler(async (req, res) => {
 // ##########----------Update Game----------##########
 const updateGame = asyncHandler(async (req, res) => {
   const { gameId } = req.params;
-  const { name, tags } = req.body;
+  const { name } = req.body;
 
   const updatedGame = await Game.findByIdAndUpdate(
     gameId,
-    { name, tags },
+    { name },
     { new: true }
   );
 
@@ -31,7 +31,7 @@ const updateGame = asyncHandler(async (req, res) => {
 
 // ##########----------Get All Games----------##########
 const getAllGames = asyncHandler(async (req, res) => {
-  const games = await Game.find().populate("tags");
+  const games = await Game.find();
 
   res.respond(200, "Games fetched successfully!", games);
 });
@@ -39,14 +39,6 @@ const getAllGames = asyncHandler(async (req, res) => {
 // ##########----------Delete Game----------##########
 const deleteGame = asyncHandler(async (req, res) => {
   const { gameId } = req.params;
-
-  const siteWithGame = await Site.findOne({ game: gameId });
-  if (siteWithGame) {
-    return res.respond(
-      400,
-      "Game is assigned to a Site and cannot be deleted!"
-    );
-  }
 
   const deletedGame = await Game.findByIdAndDelete(gameId);
   if (!deletedGame) return res.respond(404, "Game not found!");
