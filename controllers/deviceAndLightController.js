@@ -3,7 +3,7 @@ const { Device, Light, Pole } = require("../models/siteModel");
 
 // ###############---------------Device Code Starts Here ---------------###############
 // ##########----------Create Devices----------##########
-const createDevices = asyncHandler(async (req, res) => {
+const createDevice = asyncHandler(async (req, res) => {
   const { poleId } = req.params;
   const { serialNumber, deviceType } = req.body;
 
@@ -69,7 +69,7 @@ const deleteDevice = asyncHandler(async (req, res) => {
 
 // ###############---------------Light Code Starts Here ---------------###############
 // ##########----------Create Lights----------##########
-const createLights = asyncHandler(async (req, res) => {
+const createLight = asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
   const { serialNumber, tag, subTag } = req.body;
 
@@ -139,11 +139,11 @@ const deleteLight = asyncHandler(async (req, res) => {
 // ###############---------------Light Code Ends Here ---------------###############
 
 module.exports = {
-  createDevices,
+  createDevice,
   updateDevice,
   getDevicesByPole,
   deleteDevice,
-  createLights,
+  createLight,
   updateLight,
   getLightsByDevice,
   deleteLight,

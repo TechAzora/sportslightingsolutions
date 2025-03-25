@@ -1,6 +1,6 @@
 const express = require("express");
 const {
-  createLights,
+  createLight,
   updateLight,
   getLightsByDevice,
   deleteLight,
@@ -8,7 +8,7 @@ const {
 
 const router = express.Router();
 
-router.post("/createLights/:deviceId", createLights);
+router.post("/createLight/:deviceId", createLight);
 router.put("/updateLight/:lightId", updateLight);
 router.get("/getLightsByDevice/:deviceId", getLightsByDevice);
 router.delete("/deleteLight/:lightId", deleteLight);

@@ -1,13 +1,15 @@
 const express = require("express");
 const {
-  createDevices,
+  createDevice,
   getDevicesByPole,
   deleteDevice,
+  updateDevice,
 } = require("../controllers/deviceAndLightController");
 
 const router = express.Router();
 
-router.post("/createDevices/:poleId", createDevices);
+router.post("/createDevice/:poleId", createDevice);
+router.put("/updateDevice/:deviceId", updateDevice);
 router.get("/getDevicesByPole/:poleId", getDevicesByPole);
 router.delete("/deleteDevice/:deviceId", deleteDevice);
 
