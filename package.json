@@ -10,6 +10,7 @@
   "author": "Sourabh Chaurasiya",
   "license": "ISC",
   "dependencies": {
+    "aws-iot-device-sdk": "^2.2.15",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
     "cloudinary": "^1.41.3",

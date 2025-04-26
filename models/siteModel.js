@@ -96,12 +96,24 @@ const deviceSchema = mongoose.Schema(
     },
     deviceType: {
       type: String,
-      enum: ["Relay", "Dali", "DMX"],
+      enum: ["Spoke Relay", "Spoke Dali", "Spoke DMX"],
     },
-    status: {
+  },
+  { timestamps: true }
+);
+const Device = mongoose.model("Device", deviceSchema);
+// ##########----------Device Schema(IoT Device) Ends Here----------##########
+
+// ##########----------Light Type Schema Starts Here----------##########
+const lightTypeSchema = mongoose.Schema(
+  {
+    deviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Device",
+    },
+    type: {
       type: String,
-      enum: ["ON", "OFF"],
-      default: "OFF",
+      enum: ["R", "L", "X"], 
     },
     lights: [
       {
@@ -112,16 +124,15 @@ const deviceSchema = mongoose.Schema(
   },
   { timestamps: true }
 );
-const Device = mongoose.model("Device", deviceSchema);
-// ##########----------Device Schema(IoT Device) Ends Here----------##########
+const LightType = mongoose.model("LightType", lightTypeSchema);
+// ##########----------Light Type Schema Ends Here----------##########
 
 // ##########----------Light Schema----------##########
 const lightSchema = mongoose.Schema(
   {
-    deviceId: {
+    lightType: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Device",
-      required: true,
+      ref: "LightType",
     },
     serialNumber: {
       type: String,
@@ -141,8 +152,8 @@ const lightSchema = mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ON", "OFF"],
-      default: "OFF",
+      enum: ["0", "1"],
+      default: "0",
     },
   },
   { timestamps: true }
@@ -154,5 +165,6 @@ module.exports = {
   Site,
   Pole,
   Device,
+  LightType,
   Light,
 };

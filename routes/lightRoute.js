@@ -8,9 +8,9 @@ const {
 
 const router = express.Router();
 
-router.post("/createLight/:deviceId", createLight);
+router.post("/createLight/:lightType", createLight);
 router.put("/updateLight/:lightId", updateLight);
-router.get("/getLightsByDevice/:deviceId", getLightsByDevice);
+router.get("/getLightsByDevice/:lightType", getLightsByDevice);
 router.delete("/deleteLight/:lightId", deleteLight);
 
 module.exports = router;

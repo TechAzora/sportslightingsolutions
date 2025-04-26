@@ -1,5 +1,5 @@
-const asyncHandler = require("express-async-handler");
-const { Device, Light, Pole } = require("../models/siteModel");
+const { asyncHandler } = require("../utils/asyncHandler");
+const { Device, Light, Pole, LightType } = require("../models/siteModel");
 
 // ###############---------------Device Code Starts Here ---------------###############
 // ##########----------Create Devices----------##########
@@ -67,13 +67,69 @@ const deleteDevice = asyncHandler(async (req, res) => {
 });
 // ###############---------------Device Code Ends Here ---------------###############
 
+// ###############---------------Light Type Code Starts Here ---------------###############
+// ##########----------Create Light Type----------##########
+const createLightType = asyncHandler(async (req, res) => {
+  const { deviceId } = req.params;
+  const { type } = req.body;
+
+  if (!deviceId || !type) {
+    return res.respond(400, "Invalid Data!");
+  }
+
+  const createdLightType = await LightType.create({
+    deviceId,
+    type,
+  });
+
+  res.respond(201, "Light Type created successfully!", createdLightType);
+});
+
+// ##########----------Update Light Type----------##########
+const updateLightType = asyncHandler(async (req, res) => {
+  const { lightTypeId } = req.params;
+  const { type } = req.body;
+
+  const updatedLightType = await LightType.findByIdAndUpdate(
+    lightTypeId,
+    { type },
+    { new: true }
+  );
+
+  if (!updatedLightType) return res.respond(404, "Light Type not found!");
+
+  res.respond(200, "Light Type updated successfully!", updatedLightType);
+});
+
+// ##########----------Get Light Types By Device----------##########
+const getLightTypesByDevice = asyncHandler(async (req, res) => {
+  const { deviceId } = req.params;
+  if (!deviceId) return res.respond(400, "deviceId is required!");
+
+  const lightTypes = await LightType.find({ deviceId }).populate("lights");
+
+  res.respond(200, "Light Types fetched successfully!", lightTypes);
+});
+
+// ##########----------Delete Light Type----------##########
+const deleteLightType = asyncHandler(async (req, res) => {
+  const { lightTypeId } = req.params;
+
+  const deletedLightType = await LightType.findByIdAndDelete(lightTypeId);
+  if (!deletedLightType) return res.respond(404, "Light Type not found!");
+
+  res.respond(200, "Light Type deleted successfully!", deletedLightType);
+});
+
+// ###############---------------Device Code Ends Here ---------------###############
+
 // ###############---------------Light Code Starts Here ---------------###############
 // ##########----------Create Lights----------##########
 const createLight = asyncHandler(async (req, res) => {
-  const { deviceId } = req.params;
+  const { lightType } = req.params;
   const { serialNumber, tag, subTag } = req.body;
 
-  if (!deviceId || !serialNumber || !tag || !subTag) {
+  if (!lightType || !serialNumber || !tag || !subTag) {
     return res.respond(400, "Invalid Data!");
   }
 
@@ -81,10 +137,10 @@ const createLight = asyncHandler(async (req, res) => {
     serialNumber,
     tag,
     subTag,
-    deviceId,
+    lightType,
   });
 
-  await Device.findByIdAndUpdate(deviceId, {
+  await LightType.findByIdAndUpdate(lightType, {
     $addToSet: { lights: createdLight._id },
   });
 
@@ -115,10 +171,10 @@ const updateLight = asyncHandler(async (req, res) => {
 
 // ##########----------Get Lights By Device----------##########
 const getLightsByDevice = asyncHandler(async (req, res) => {
-  const { deviceId } = req.params;
-  if (!deviceId) return res.respond(400, "deviceId is required!");
+  const { lightType } = req.params;
+  if (!lightType) return res.respond(400, "lightType is required!");
 
-  const lights = await Light.find({ deviceId });
+  const lights = await Light.find({ lightType });
 
   res.respond(200, "Lights fetched successfully!", lights);
 });
@@ -130,7 +186,7 @@ const deleteLight = asyncHandler(async (req, res) => {
   const deletedLight = await Light.findByIdAndDelete(lightId);
   if (!deletedLight) return res.respond(404, "Light not found!");
 
-  await Device.findByIdAndUpdate(deletedLight.deviceId, {
+  await LightType.findByIdAndUpdate(deletedLight.lightType, {
     $pull: { lights: lightId },
   });
 
@@ -143,6 +199,10 @@ module.exports = {
   updateDevice,
   getDevicesByPole,
   deleteDevice,
+  createLightType,
+  updateLightType,
+  getLightTypesByDevice,
+  deleteLightType,
   createLight,
   updateLight,
   getLightsByDevice,

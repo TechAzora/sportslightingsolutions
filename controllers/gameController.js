@@ -1,4 +1,4 @@
-const asyncHandler = require("express-async-handler");
+const { asyncHandler } = require("../utils/asyncHandler");
 const Game = require("../models/gameModel");
 const { Site } = require("../models/siteModel");
 

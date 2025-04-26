@@ -1,4 +1,4 @@
-const asyncHandler = require("express-async-handler");
+const { asyncHandler } = require("../utils/asyncHandler");
 const Game = require("../models/gameModel");
 const { Tag, SubTag } = require("../models/tagModel");
 
@@ -78,7 +78,8 @@ const deleteTag = asyncHandler(async (req, res) => {
 const createSubTag = asyncHandler(async (req, res) => {
   const { name, tag } = req.body;
 
-  if (!name || !tag) return res.respond(400, "SubTag and Tag name is required!");
+  if (!name || !tag)
+    return res.respond(400, "SubTag and Tag name is required!");
 
   const newSubTag = await SubTag.create({ name, tag });
 
