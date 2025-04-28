@@ -9,6 +9,9 @@ router.use("/pole", require("./routes/poleRoute"));
 router.use("/game", require("./routes/gameRoute"));
 router.use("/tag", require("./routes/tagRoute"));
 router.use("/device", require("./routes/deviceRoute"));
+router.use("/lightType", require("./routes/lightTypeRoute"));
 router.use("/light", require("./routes/lightRoute"));
+router.use("/mqttLight", require("./routes/mqttLightRoute"));
+router.use("/about", require("./routes/aboutRoute"));
 
 module.exports = router;

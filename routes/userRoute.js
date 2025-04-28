@@ -24,6 +24,6 @@ router.put("/updateUserProfile/:id", updateUserProfile);
 router.patch("/updateUserStatus/:id", updateUserStatus);
 router.get("/getAllUsers", getAllUsers);
 router.get("/getUserProfile", validateToken, getUserProfile);
-router.get("/deleteUserProfile/:id", deleteUserProfile);
+router.delete("/deleteUserProfile/:id", deleteUserProfile);
 
 module.exports = router;
