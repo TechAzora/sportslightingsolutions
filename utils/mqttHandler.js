@@ -2,9 +2,9 @@ const awsIot = require("aws-iot-device-sdk");
 const path = require("path");
 
 const device = awsIot.device({
-  keyPath: path.resolve(__dirname, process.env.MQTT_KEY_PATH),
-  certPath: path.resolve(__dirname, process.env.MQTT_CERT_PATH),
-  caPath: path.resolve(__dirname, process.env.MQTT_CA_PATH),
+  keyPath: path.resolve(__dirname, "../", process.env.MQTT_KEY_PATH),
+  certPath: path.resolve(__dirname, "../", process.env.MQTT_CERT_PATH),
+  caPath: path.resolve(__dirname, "../", process.env.MQTT_CA_PATH),
   clientId: process.env.MQTT_CLIENT_ID,
   host: process.env.MQTT_HOST,
 });
