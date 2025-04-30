@@ -1,4 +1,5 @@
 const awsIot = require("aws-iot-device-sdk");
+const path = require("path");
 
 const device = awsIot.device({
   keyPath: path.resolve(__dirname, process.env.MQTT_KEY_PATH),
