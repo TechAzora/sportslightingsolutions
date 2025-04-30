@@ -1,10 +1,27 @@
 const awsIot = require("aws-iot-device-sdk");
+const fs = require("fs");
 const path = require("path");
 
+let keyPath, certPath, caPath;
+
+if (process.env.NODE_ENV !== "production") {
+  keyPath = path.resolve(__dirname, "../", process.env.MQTT_KEY_PATH);
+  certPath = path.resolve(__dirname, "../", process.env.MQTT_CERT_PATH);
+  caPath = path.resolve(__dirname, "../", process.env.MQTT_CA_PATH);
+} else {
+  fs.writeFileSync("/tmp/mqtt.key", process.env.MQTT_KEY);
+  fs.writeFileSync("/tmp/mqtt.crt", process.env.MQTT_CERT);
+  fs.writeFileSync("/tmp/mqtt.ca", process.env.MQTT_CA);
+
+  keyPath = "/tmp/mqtt.key";
+  certPath = "/tmp/mqtt.crt";
+  caPath = "/tmp/mqtt.ca";
+}
+
 const device = awsIot.device({
-  keyPath: path.resolve(__dirname, "../", process.env.MQTT_KEY_PATH),
-  certPath: path.resolve(__dirname, "../", process.env.MQTT_CERT_PATH),
-  caPath: path.resolve(__dirname, "../", process.env.MQTT_CA_PATH),
+  keyPath,
+  certPath,
+  caPath,
   clientId: process.env.MQTT_CLIENT_ID,
   host: process.env.MQTT_HOST,
 });
