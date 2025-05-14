@@ -13,5 +13,7 @@ router.use("/lightType", require("./routes/lightTypeRoute"));
 router.use("/light", require("./routes/lightRoute"));
 router.use("/mqttLight", require("./routes/mqttLightRoute"));
 router.use("/about", require("./routes/aboutRoute"));
+router.use("/termCondition", require("./routes/termConditionRoute"));
+router.use("/privacyPolicy", require("./routes/privacyPolicyRoute"));
 
 module.exports = router;
