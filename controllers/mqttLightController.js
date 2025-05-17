@@ -1,5 +1,5 @@
 const { asyncHandler } = require("../utils/asyncHandler");
-const { Device, Light, LightType } = require("../models/siteModel");
+const { Device, Light, LightType, Pole } = require("../models/siteModel");
 const { publishToMQTT, subscribeToMQTT } = require("../utils/mqttHandler");
 
 // ##########----------Handle Single Light----------##########
@@ -233,26 +233,26 @@ const handleLight = asyncHandler(async (req, res) => {
 
 // Utility to fetch and group lights by device/type from pole IDs
 const fetchGroupedLightsByPoles = async (poleIds) => {
-  const lights = await Light.find({ pole: { $in: poleIds } }).populate({
-    path: "lightType",
-    populate: { path: "deviceId" },
-  });
+  const poles = await Pole.find({ _id: { $in: poleIds } }).populate("devices");
 
   const grouped = {};
 
-  for (const light of lights) {
-    const { lightType } = light;
-    const device = lightType?.deviceId;
-    if (!device) continue;
+   for (const pole of poles) {
+    for (const device of pole.devices) {
+      const lightTypes = await LightType.find({ deviceId: device._id }).populate("lights");
 
-    const deviceSerial = device.serialNumber;
-    const type = lightType.type;
+      for (const lt of lightTypes) {
+        const deviceSerial = device.serialNumber;
+        const type = lt.type;
 
-    if (!grouped[deviceSerial]) grouped[deviceSerial] = {};
-    if (!grouped[deviceSerial][type]) grouped[deviceSerial][type] = [];
+        if (!grouped[deviceSerial]) grouped[deviceSerial] = {};
+        if (!grouped[deviceSerial][type]) grouped[deviceSerial][type] = [];
 
-    grouped[deviceSerial][type].push(light);
+        grouped[deviceSerial][type].push(...lt.lights);
+      }
+    }
   }
+  console.log(grouped);
 
   return grouped;
 };
@@ -270,250 +270,303 @@ const publishAndConfirm = async (topic, payload) => {
 };
 
 // Controller 1: Random Lights by Pole
-const handleRandomLightsByPoles = asyncHandler(async (req, res) => {
-  const { poleIds } = req.body; // expects array of pole IDs
-  const poles = [...poleIds];
+// Shared response queue
+const mqttResponseQueue = [];
 
-  for (const poleId of poles) {
-    const grouped = await fetchGroupedLightsByPoles([poleId]);
+// Subscribe once — to be called before entering the loop
+const ensureMQTTSubscribed = () => {
+  let alreadySubscribed = false;
+
+  return () => {
+    if (alreadySubscribed) return;
+    alreadySubscribed = true;
+
+    subscribeToMQTT("subtest", (incomingData) => {
+      if (incomingData) {
+        mqttResponseQueue.push(incomingData);
+        console.log("MQTT Response Received:", incomingData);
+      }
+    });
+  };
+};
+
+const initializeMQTTSubscription = ensureMQTTSubscribed();
+
+const handleRandomLightsByPoles = asyncHandler(async (req, res) => {
+  const { poleIds, interval = 1000 } = req.body;
+
+  const grouped = await fetchGroupedLightsByPoles(poleIds);
+
+  // Respond immediately to client (acknowledging start)
+  res.respond(200, "Random simulation started. Check server logs for MQTT activity.");
+
+  // Initialize MQTT subscription only once
+  initializeMQTTSubscription();
+
+  // Infinite loop
+  while (true) {
     const response = {};
 
     for (const [deviceSerial, types] of Object.entries(grouped)) {
       response[deviceSerial] = {};
 
       for (const [type, lights] of Object.entries(types)) {
-        const sorted = lights.sort(
-          (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
-        );
+        const randomLights = lights.filter(() => Math.random() > 0.5);
 
-        if (type === "R") {
-          response[deviceSerial][type] = sorted.map(() => 1);
-        } else if (type === "X") {
-          response[deviceSerial][type] = sorted.map(() => 100);
+        if (type === "R" || type === "X") {
+          response[deviceSerial][type] = lights.map(light =>
+            randomLights.includes(light) ? (type === "R" ? 1 : 100) : 0
+          );
         } else if (type === "L") {
           response[deviceSerial][type] = {};
-          sorted.forEach(
-            (l) => (response[deviceSerial][type][l.serialNumber] = 100)
-          );
+          lights.forEach(light => {
+            response[deviceSerial][type][light.serialNumber] = randomLights.includes(light) ? 100 : 0;
+          });
+        }
+
+        // Update DB status and brightness
+        for (const light of lights) {
+          const isOn = randomLights.includes(light);
+          light.status = isOn ? "1" : "0";
+          light.brightness = isOn ? 100 : 0;
+          await light.save();
         }
       }
     }
 
-    const mqttResponse = await publishAndConfirm("pubtest", response);
+    // Publish random pattern
+    await publishToMQTT("pubtest", response);
 
-    if (mqttResponse.received) {
-      for (const typeLights of Object.values(grouped)) {
-        for (const lights of Object.values(typeLights)) {
-          for (const light of lights) {
-            light.status = "1";
-            light.brightness = 100;
-            await light.save();
-          }
-        }
-      }
+    // Log MQTT response if any
+    if (mqttResponseQueue.length > 0) {
+      const lastResponse = mqttResponseQueue.pop();
+      console.log("Matching MQTT Response:", lastResponse);
     }
 
-    await delay(1000);
-
-    // Turn off all other poles' lights
-    const otherLights = await Light.find({ pole: { $nin: [poleId] } });
-    const offResponse = {};
-
-    for (const light of otherLights) {
-      const lightType = await LightType.findById(light.lightType).populate(
-        "deviceId"
-      );
-      const deviceSerial = lightType.deviceId.serialNumber;
-      const type = lightType.type;
-      if (!offResponse[deviceSerial]) offResponse[deviceSerial] = {};
-
-      if (type === "R") {
-        if (!offResponse[deviceSerial][type])
-          offResponse[deviceSerial][type] = [];
-        offResponse[deviceSerial][type].push(0);
-      } else if (type === "X") {
-        if (!offResponse[deviceSerial][type])
-          offResponse[deviceSerial][type] = [];
-        offResponse[deviceSerial][type].push(0);
-      } else if (type === "L") {
-        if (!offResponse[deviceSerial][type])
-          offResponse[deviceSerial][type] = {};
-        offResponse[deviceSerial][type][light.serialNumber] = 0;
-      }
-
-      light.status = "0";
-      light.brightness = 0;
-      await light.save();
-    }
-
-    await publishAndConfirm("pubtest", offResponse);
-    await delay(1000);
+    // Wait before next loop
+    await delay(interval);
   }
-
-  res.respond(200, "Random pattern simulation completed");
 });
 
 // Controller 2: Wave Lights by Poles
 const handleWaveLightsByPoles = asyncHandler(async (req, res) => {
-  const { poleIds } = req.body;
-  for (const poleId of poleIds) {
-    const grouped = await fetchGroupedLightsByPoles([poleId]);
-    const response = {};
+  const { poleIds, speed = 500 } = req.body;
 
-    for (const [deviceSerial, types] of Object.entries(grouped)) {
-      response[deviceSerial] = {};
-      for (const [type, lights] of Object.entries(types)) {
-        const sorted = lights.sort(
-          (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
-        );
+  // Acknowledge start immediately
+  res.respond(200, "Wave pattern simulation started. Running indefinitely...");
 
-        for (let i = 0; i < sorted.length; i++) {
-          const singleStep = JSON.parse(JSON.stringify(response));
-          if (type === "R") {
-            singleStep[deviceSerial][type] = sorted.map((_, idx) =>
-              idx === i ? 1 : 0
-            );
-          } else if (type === "X") {
-            singleStep[deviceSerial][type] = sorted.map((_, idx) =>
-              idx === i ? 100 : 0
-            );
-          } else if (type === "L") {
-            singleStep[deviceSerial][type] = {};
-            sorted.forEach((l, idx) => {
-              singleStep[deviceSerial][type][l.serialNumber] =
-                idx === i ? 100 : 0;
-            });
-          }
+  // One-time MQTT subscription for incoming responses
+  let subscribed = false;
+  if (!subscribed) {
+    subscribed = true;
+    subscribeToMQTT("subtest", (incomingData) => {
+      if (incomingData) {
+        console.log("MQTT Response:", incomingData);
+      }
+    });
+  }
 
-          const mqttResponse = await publishAndConfirm("pubtest", singleStep);
-          if (mqttResponse.received) {
-            for (let j = 0; j < sorted.length; j++) {
-              sorted[j].status = j === i ? "1" : "0";
-              sorted[j].brightness = j === i ? 100 : 0;
-              await sorted[j].save();
+  // Start continuous wave effect
+  while (true) {
+    for (const poleId of poleIds) {
+      const grouped = await fetchGroupedLightsByPoles([poleId]);
+
+      for (const [deviceSerial, types] of Object.entries(grouped)) {
+        for (const [type, lights] of Object.entries(types)) {
+          const sorted = lights.sort(
+            (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
+          );
+
+          for (let i = 0; i < sorted.length; i++) {
+            const response = {};
+            response[deviceSerial] = {};
+
+            if (type === "R" || type === "X") {
+              response[deviceSerial][type] = sorted.map((_, idx) =>
+                idx === i ? (type === "R" ? 1 : 100) : 0
+              );
+            } else if (type === "L") {
+              response[deviceSerial][type] = {};
+              sorted.forEach((l, idx) => {
+                response[deviceSerial][type][l.serialNumber] = idx === i ? 100 : 0;
+              });
             }
+
+            // Publish current step to MQTT
+            await publishToMQTT("pubtest", response);
+
+            // Save state in DB
+            for (let j = 0; j < sorted.length; j++) {
+              const light = sorted[j];
+              const isOn = j === i;
+              light.status = isOn ? "1" : "0";
+              light.brightness = isOn ? 100 : 0;
+              await light.save();
+            }
+
+            // Delay before next step
+            await delay(speed);
           }
-          await delay(500);
         }
       }
     }
   }
-  res.respond(200, "Wave pattern simulation completed");
 });
+
 
 // Controller 3: Marquee Lights by Poles
 const handleMarqueeLightsByPoles = asyncHandler(async (req, res) => {
-  const { poleIds, speed } = req.body; // expects array of pole IDs and speed (ms per step)
+  const { poleIds, speed = 500 } = req.body; // speed is delay in ms
 
-  for (const poleId of poleIds) {
-    const grouped = await fetchGroupedLightsByPoles([poleId]);
-    const response = {};
+  // Acknowledge start of marquee simulation
+  res.respond(200, "Marquee pattern simulation started. Running indefinitely...");
 
-    for (const [deviceSerial, types] of Object.entries(grouped)) {
-      response[deviceSerial] = {};
-      for (const [type, lights] of Object.entries(types)) {
-        const sorted = lights.sort(
-          (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
-        );
+  // Subscribe once to MQTT
+  let subscribed = false;
+  if (!subscribed) {
+    subscribed = true;
+    subscribeToMQTT("subtest", (incomingData) => {
+      if (incomingData) {
+        console.log("MQTT Response:", incomingData);
+      }
+    });
+  }
 
-        let currentIndex = 0;
+  // Run marquee continuously
+  while (true) {
+    for (const poleId of poleIds) {
+      const grouped = await fetchGroupedLightsByPoles([poleId]);
 
-        for (let i = 0; i < sorted.length; i++) {
-          const singleStep = JSON.parse(JSON.stringify(response));
+      for (const [deviceSerial, types] of Object.entries(grouped)) {
+        for (const [type, lights] of Object.entries(types)) {
+          const sorted = lights.sort(
+            (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
+          );
 
-          // Marquee effect
-          if (type === "R") {
-            singleStep[deviceSerial][type] = sorted.map((_, idx) =>
-              idx === currentIndex ? 1 : 0
-            );
-          } else if (type === "X") {
-            singleStep[deviceSerial][type] = sorted.map((_, idx) =>
-              idx === currentIndex ? 100 : 0
-            );
-          } else if (type === "L") {
-            singleStep[deviceSerial][type] = {};
-            sorted.forEach((l, idx) => {
-              singleStep[deviceSerial][type][l.serialNumber] =
-                idx === currentIndex ? 100 : 0;
-            });
-          }
+          for (let currentIndex = 0; currentIndex < sorted.length; currentIndex++) {
+            const response = {};
+            response[deviceSerial] = {};
 
-          // Publish the step
-          const mqttResponse = await publishAndConfirm("pubtest", singleStep);
-          if (mqttResponse.received) {
-            for (let j = 0; j < sorted.length; j++) {
-              sorted[j].status = j === currentIndex ? "1" : "0";
-              sorted[j].brightness = j === currentIndex ? 100 : 0;
-              await sorted[j].save();
+            if (type === "R" || type === "X") {
+              response[deviceSerial][type] = sorted.map((_, idx) =>
+                idx === currentIndex ? (type === "R" ? 1 : 100) : 0
+              );
+            } else if (type === "L") {
+              response[deviceSerial][type] = {};
+              sorted.forEach((l, idx) => {
+                response[deviceSerial][type][l.serialNumber] = idx === currentIndex ? 100 : 0;
+              });
             }
-          }
 
-          // Move to the next light in the sequence
-          currentIndex = (currentIndex + 1) % sorted.length;
-          await delay(speed); // Apply speed to control how fast the marquee moves
+            // Publish marquee pattern step
+            await publishToMQTT("pubtest", response);
+
+            // Update light states in DB
+            for (let j = 0; j < sorted.length; j++) {
+              const light = sorted[j];
+              const isOn = j === currentIndex;
+              light.status = isOn ? "1" : "0";
+              light.brightness = isOn ? 100 : 0;
+              await light.save();
+            }
+
+            // Delay before moving to next step
+            await delay(speed);
+          }
         }
       }
     }
   }
-  res.respond(200, "Marquee pattern simulation completed");
 });
 
-// Controller 4: Chase Lights by Poles
+
 const handleChaseLightsByPoles = asyncHandler(async (req, res) => {
-  const { poleIds, speed } = req.body; // expects array of pole IDs and speed (ms per step)
+  const { poleIds, speed = 500 } = req.body;
 
-  for (const poleId of poleIds) {
-    const grouped = await fetchGroupedLightsByPoles([poleId]);
-    const response = {};
+  res.respond(200, "Chase pattern simulation started. Running indefinitely...");
 
-    for (const [deviceSerial, types] of Object.entries(grouped)) {
-      response[deviceSerial] = {};
-      for (const [type, lights] of Object.entries(types)) {
-        const sorted = lights.sort(
-          (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
-        );
+  const runChaseForPole = async (poleId) => {
+    try {
+      const grouped = await fetchGroupedLightsByPoles([poleId]);
 
-        let currentIndex = 0;
+      // Pre-sort lights per device/type once
+      const sortedLightsByDeviceType = {};
 
-        for (let i = 0; i < sorted.length; i++) {
-          const singleStep = JSON.parse(JSON.stringify(response));
-
-          // Chase effect
-          if (type === "R") {
-            singleStep[deviceSerial][type] = sorted.map((_, idx) =>
-              idx === currentIndex ? 1 : 0
-            );
-          } else if (type === "X") {
-            singleStep[deviceSerial][type] = sorted.map((_, idx) =>
-              idx === currentIndex ? 100 : 0
-            );
-          } else if (type === "L") {
-            singleStep[deviceSerial][type] = {};
-            sorted.forEach((l, idx) => {
-              singleStep[deviceSerial][type][l.serialNumber] =
-                idx === currentIndex ? 100 : 0;
-            });
-          }
-
-          // Publish the step
-          const mqttResponse = await publishAndConfirm("pubtest", singleStep);
-          if (mqttResponse.received) {
-            for (let j = 0; j < sorted.length; j++) {
-              sorted[j].status = j === currentIndex ? "1" : "0";
-              sorted[j].brightness = j === currentIndex ? 100 : 0;
-              await sorted[j].save();
-            }
-          }
-
-          // Move to the next light in the sequence
-          currentIndex = (currentIndex + 1) % sorted.length;
-          await delay(speed); // Apply speed to control how fast the chase moves
+      for (const [deviceSerial, types] of Object.entries(grouped)) {
+        sortedLightsByDeviceType[deviceSerial] = {};
+        for (const [type, lights] of Object.entries(types)) {
+          sortedLightsByDeviceType[deviceSerial][type] = lights.sort(
+            (a, b) => parseInt(a.serialNumber) - parseInt(b.serialNumber)
+          );
         }
       }
+
+      let currentIndex = 0;
+      const maxLength = Math.max(
+        ...Object.values(sortedLightsByDeviceType).flatMap(device =>
+          Object.values(device).map(lights => lights.length)
+        )
+      );
+
+      while (true) {
+        const singleStep = {};
+
+        // Build the state for currentIndex
+        for (const [deviceSerial, types] of Object.entries(sortedLightsByDeviceType)) {
+          singleStep[deviceSerial] = {};
+
+          for (const [type, sortedLights] of Object.entries(types)) {
+            if (type === "R") {
+              singleStep[deviceSerial][type] = sortedLights.map((_, idx) =>
+                idx === currentIndex ? 1 : 0
+              );
+            } else if (type === "X") {
+              singleStep[deviceSerial][type] = sortedLights.map((_, idx) =>
+                idx === currentIndex ? 100 : 0
+              );
+            } else if (type === "L") {
+              singleStep[deviceSerial][type] = {};
+              sortedLights.forEach((l, idx) => {
+                singleStep[deviceSerial][type][l.serialNumber] =
+                  idx === currentIndex ? 100 : 0;
+              });
+            }
+          }
+        }
+
+        // Publish and update DB
+        const mqttResponse = await publishAndConfirm("pubtest", singleStep);
+        if (mqttResponse.received) {
+          for (const types of Object.values(sortedLightsByDeviceType)) {
+            for (const lights of Object.values(types)) {
+              for (let j = 0; j < lights.length; j++) {
+                lights[j].status = j === currentIndex ? "1" : "0";
+                lights[j].brightness = j === currentIndex ? 100 : 0;
+                await lights[j].save();
+              }
+            }
+          }
+        }
+
+        currentIndex = (currentIndex + 1) % maxLength;
+        await delay(speed);
+      }
+    } catch (err) {
+      console.error(`Error in runChaseForPole for poleId ${poleId}:`, err);
     }
-  }
-  res.respond(200, "Chase pattern simulation completed");
+  };
+
+  // Start all pole loops concurrently but don't await them so the handler finishes immediately
+  poleIds.forEach(poleId => {
+    setImmediate(() => {
+      runChaseForPole(poleId);
+    });
+  });
 });
+
+
+
+
 
 module.exports = {
   handleSingleLight,
