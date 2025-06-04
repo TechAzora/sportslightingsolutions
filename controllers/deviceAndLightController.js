@@ -47,7 +47,7 @@ const getDevicesByPole = asyncHandler(async (req, res) => {
   const { poleId } = req.params;
   if (!poleId) return res.respond(400, "poleId is required!");
 
-  const devices = await Device.find({ poleId }).populate("lights");
+  const devices = await Device.find({ poleId });
 
   res.respond(200, "Devices fetched successfully!", devices);
 });
